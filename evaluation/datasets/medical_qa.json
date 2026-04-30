@@ -1,0 +1,20 @@
+[
+  {
+    "id": "001",
+    "question": "What are the common side effects of metformin?",
+    "expected_keywords": ["nausea", "diarrhea", "gastrointestinal", "lactic acidosis"],
+    "source_document": null
+  },
+  {
+    "id": "002",
+    "question": "What is the first-line treatment for Type 2 diabetes?",
+    "expected_keywords": ["metformin", "lifestyle", "diet", "exercise"],
+    "source_document": null
+  },
+  {
+    "id": "003",
+    "question": "Describe the mechanism of action of beta-blockers.",
+    "expected_keywords": ["beta-adrenergic", "heart rate", "blood pressure", "catecholamines"],
+    "source_document": null
+  }
+]
