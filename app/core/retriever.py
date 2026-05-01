@@ -1,4 +1,3 @@
-import asyncio
 import uuid
 
 from app.config import get_settings
@@ -60,18 +59,17 @@ class Retriever:
         """Runs vector search and full-text search in parallel, merges with RRF."""
         query_embedding = await self._embedding_service.embed_text(query)
 
-        vector_results, bm25_results = await asyncio.gather(
-            self._chunk_repo.similarity_search(
-                query_embedding=query_embedding,
-                top_k=top_k,
-                similarity_threshold=similarity_threshold,
-                document_ids=document_ids,
-            ),
-            self._chunk_repo.fulltext_search(
-                query=query,
-                top_k=top_k,
-                document_ids=document_ids,
-            ),
+        # Sequential — asyncio.gather causes concurrent ops on the same session which SQLAlchemy disallows
+        vector_results = await self._chunk_repo.similarity_search(
+            query_embedding=query_embedding,
+            top_k=top_k,
+            similarity_threshold=similarity_threshold,
+            document_ids=document_ids,
+        )
+        bm25_results = await self._chunk_repo.fulltext_search(
+            query=query,
+            top_k=top_k,
+            document_ids=document_ids,
         )
 
         merged = self._reciprocal_rank_fusion(vector_results, bm25_results, top_k=top_k)
