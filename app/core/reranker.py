@@ -24,15 +24,14 @@ class Reranker:
     @property
     def model(self):
         if self._model is None:
-            from sentence_transformers import CrossEncoder
-            logger.info("loading_reranker_model", model=self.model_name)
-            self._model = CrossEncoder(self.model_name)
+            try:
+                from sentence_transformers import CrossEncoder
+                logger.info("loading_reranker_model", model=self.model_name)
+                self._model = CrossEncoder(self.model_name)
+            except ImportError:
+                logger.warning("reranker_disabled", reason="sentence_transformers not installed")
+                self._model = False  # sentinel: tried but unavailable
         return self._model
-
-    def _score(self, query: str, results: list[SimilarChunk]) -> list[tuple[SimilarChunk, float]]:
-        pairs = [(query, r.chunk.content) for r in results]
-        scores = self.model.predict(pairs)
-        return list(zip(results, scores.tolist()))
 
     async def rerank(
         self,
@@ -42,11 +41,15 @@ class Reranker:
     ) -> list[SimilarChunk]:
         if not results:
             return results
+        if not self.model:
+            # sentence_transformers not available — return retrieval results as-is
+            return results[:top_k] if top_k else results
         try:
             logger.info("reranking_chunks", candidates=len(results), top_k=top_k)
             loop = asyncio.get_running_loop()
-            scored = await loop.run_in_executor(None, lambda: self._score(query, results))
-            scored.sort(key=lambda x: x[1], reverse=True)
+            pairs = [(query, r.chunk.content) for r in results]
+            scored_pairs = await loop.run_in_executor(None, lambda: self.model.predict(pairs))
+            scored = sorted(zip(results, scored_pairs.tolist()), key=lambda x: x[1], reverse=True)
             reranked = [chunk for chunk, _ in scored]
             logger.info("reranking_complete", returned=min(top_k or len(reranked), len(reranked)))
             return reranked[:top_k] if top_k else reranked
