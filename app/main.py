@@ -7,6 +7,7 @@ from fastapi.responses import JSONResponse
 
 from app.api.routes import chat, documents, health, search, sessions
 from app.config import get_settings
+from app.core.embeddings import get_embedding_service
 from app.db.database import create_tables, dispose_engine
 from app.utils.exceptions import MedRAGError
 from app.utils.logger import configure_logging, get_logger
@@ -20,6 +21,7 @@ logger = get_logger(__name__)
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     logger.info("startup", env=settings.app_env)
     await create_tables()
+    get_embedding_service().model  # warm up model before first request
     yield
     await dispose_engine()
     logger.info("shutdown")
