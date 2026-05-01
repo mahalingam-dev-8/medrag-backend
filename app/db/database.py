@@ -7,12 +7,20 @@ from app.config import get_settings
 
 settings = get_settings()
 
+# asyncpg doesn't accept sslmode= as a query param — strip it and use connect_args
+_db_url = settings.database_url
+_connect_args: dict = {}
+if "sslmode=require" in _db_url:
+    _db_url = _db_url.replace("?sslmode=require", "").replace("&sslmode=require", "")
+    _connect_args["ssl"] = True
+
 engine = create_async_engine(
-    settings.database_url,
+    _db_url,
     echo=settings.app_env == "development",
     pool_size=10,
     max_overflow=20,
     pool_pre_ping=True,
+    connect_args=_connect_args,
 )
 
 AsyncSessionLocal = async_sessionmaker(
