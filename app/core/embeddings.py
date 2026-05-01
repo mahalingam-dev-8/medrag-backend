@@ -1,4 +1,5 @@
 import asyncio
+import gc
 from functools import lru_cache
 
 from fastembed import TextEmbedding
@@ -8,6 +9,8 @@ from app.utils.exceptions import EmbeddingError
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
+
+_BATCH_SIZE = 8  # small batches to keep peak memory low on free tier
 
 
 class EmbeddingService:
@@ -24,7 +27,12 @@ class EmbeddingService:
         return self._model
 
     def _encode(self, texts: list[str]) -> list[list[float]]:
-        return [emb.tolist() for emb in self.model.embed(texts)]
+        results: list[list[float]] = []
+        for i in range(0, len(texts), _BATCH_SIZE):
+            batch = texts[i : i + _BATCH_SIZE]
+            results.extend(emb.tolist() for emb in self.model.embed(batch))
+            gc.collect()
+        return results
 
     async def embed_text(self, text: str) -> list[float]:
         try:
@@ -34,7 +42,7 @@ class EmbeddingService:
         except Exception as exc:
             raise EmbeddingError(f"Failed to embed text: {exc}") from exc
 
-    async def embed_batch(self, texts: list[str], batch_size: int = 64) -> list[list[float]]:
+    async def embed_batch(self, texts: list[str], batch_size: int = _BATCH_SIZE) -> list[list[float]]:
         if not texts:
             return []
         try:
