@@ -1,20 +1,22 @@
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, UploadFile, status
 from pydantic import BaseModel
 
 from app.api.dependencies import get_ingestion_service
+from app.db.database import get_db
 from app.services.ingestion_service import IngestionService
 from app.utils.exceptions import DocumentNotFoundError
+from app.utils.logger import get_logger
 
+logger = get_logger(__name__)
 router = APIRouter(prefix="/documents", tags=["documents"])
 
 
 class IngestResponse(BaseModel):
-    document_id: str
+    message: str
     filename: str
-    total_chunks: int
-    skipped: bool
+    status: str  # always "processing" — frontend polls GET /documents/ to detect completion
 
 
 class DocumentResponse(BaseModel):
@@ -25,21 +27,37 @@ class DocumentResponse(BaseModel):
     total_chunks: int
 
 
-@router.post("/ingest", response_model=IngestResponse, status_code=status.HTTP_201_CREATED)
+async def _ingest_in_background(data: bytes, filename: str) -> None:
+    """Runs after the 202 response is sent, with its own DB session."""
+    try:
+        async for session in get_db():
+            service = IngestionService(session)
+            result = await service.ingest_upload(data, filename)
+            logger.info("background_ingest_complete", filename=filename, chunks=result.total_chunks)
+    except Exception as exc:
+        logger.error("background_ingest_failed", filename=filename, error=str(exc))
+
+
+@router.post("/ingest", response_model=IngestResponse, status_code=status.HTTP_202_ACCEPTED)
 async def ingest_document(
     file: UploadFile,
-    service: IngestionService = Depends(get_ingestion_service),
+    background_tasks: BackgroundTasks,
 ) -> IngestResponse:
+    """
+    Accepts the file and returns immediately.
+    Embedding + storage runs in the background.
+    Frontend polls GET /documents/ every few seconds until the document appears.
+    """
     if not file.filename:
         raise HTTPException(status_code=400, detail="Filename is required")
 
     data = await file.read()
-    result = await service.ingest_upload(data, file.filename)
+    background_tasks.add_task(_ingest_in_background, data, file.filename)
+
     return IngestResponse(
-        document_id=result.document_id,
-        filename=result.filename,
-        total_chunks=result.total_chunks,
-        skipped=result.skipped,
+        message="Document received and queued for processing",
+        filename=file.filename,
+        status="processing",
     )
 
 
