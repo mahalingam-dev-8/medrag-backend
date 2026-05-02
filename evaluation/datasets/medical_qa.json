@@ -1,20 +1,122 @@
 [
   {
     "id": "001",
-    "question": "What are the common side effects of metformin?",
-    "expected_keywords": ["nausea", "diarrhea", "gastrointestinal", "lactic acidosis"],
+    "question": "What criteria are used to diagnose diabetes using A1C and glucose tests?",
+    "answer": "A1C >= 6.5%, fasting glucose >= 126 mg/dL, or 2-hour glucose >= 200 mg/dL.",
     "source_document": null
   },
   {
     "id": "002",
-    "question": "What is the first-line treatment for Type 2 diabetes?",
-    "expected_keywords": ["metformin", "lifestyle", "diet", "exercise"],
+    "question": "Who should be screened for diabetes and how often should screening be done?",
+    "answer": "Adults aged 40 to 70 who are overweight or obese should be screened every 1 to 3 years depending on risk.",
     "source_document": null
   },
   {
     "id": "003",
-    "question": "Describe the mechanism of action of beta-blockers.",
-    "expected_keywords": ["beta-adrenergic", "heart rate", "blood pressure", "catecholamines"],
+    "question": "What are the key risk factors for developing type 2 diabetes?",
+    "answer": "Obesity, family history, physical inactivity, hypertension, and abnormal lipid levels.",
+    "source_document": null
+  },
+  {
+    "id": "004",
+    "question": "How can lifestyle modifications help prevent or delay type 2 diabetes?",
+    "answer": "Through weight loss, healthy diet, and regular physical activity.",
+    "source_document": null
+  },
+  {
+    "id": "005",
+    "question": "What role does metformin play in preventing type 2 diabetes?",
+    "answer": "It reduces the risk of developing diabetes in high-risk individuals.",
+    "source_document": null
+  },
+  {
+    "id": "006",
+    "question": "What is diabetes self-management education (DSMES) and why is it important?",
+    "answer": "It helps patients develop skills to manage diabetes and improves outcomes like glycemic control.",
+    "source_document": null
+  },
+  {
+    "id": "007",
+    "question": "What is meant by patient-centered care in diabetes management?",
+    "answer": "Care that involves patient preferences and shared decision-making.",
+    "source_document": null
+  },
+  {
+    "id": "008",
+    "question": "How does obesity contribute to the development of type 2 diabetes?",
+    "answer": "It increases insulin resistance, leading to higher diabetes risk.",
+    "source_document": null
+  },
+  {
+    "id": "009",
+    "question": "What percentage of adults are aware that diabetes can be prevented?",
+    "answer": "Approximately 79% are aware.",
+    "source_document": null
+  },
+  {
+    "id": "010",
+    "question": "What proportion of individuals report having a family history of diabetes?",
+    "answer": "About 39% of respondents reported a family history.",
+    "source_document": null
+  },
+  {
+    "id": "011",
+    "question": "What is heart failure and how does it affect blood circulation?",
+    "answer": "It is a condition where the heart cannot pump enough blood to meet the body's needs.",
+    "source_document": null
+  },
+  {
+    "id": "012",
+    "question": "What are the main mechanisms that lead to heart failure?",
+    "answer": "The heart either cannot fill with enough blood or cannot pump effectively.",
+    "source_document": null
+  },
+  {
+    "id": "013",
+    "question": "What are the common symptoms associated with heart failure?",
+    "answer": "Fatigue, shortness of breath, and fluid buildup in the body.",
+    "source_document": null
+  },
+  {
+    "id": "014",
+    "question": "What conditions commonly lead to heart failure?",
+    "answer": "Coronary artery disease, high blood pressure, cardiomyopathy, and arrhythmias.",
+    "source_document": null
+  },
+  {
+    "id": "015",
+    "question": "What is the difference between acute and chronic heart failure?",
+    "answer": "Acute develops suddenly, while chronic develops gradually over time.",
+    "source_document": null
+  },
+  {
+    "id": "016",
+    "question": "How is heart failure diagnosed?",
+    "answer": "Through medical history, physical exam, imaging, and blood tests.",
+    "source_document": null
+  },
+  {
+    "id": "017",
+    "question": "What complications can arise from heart failure?",
+    "answer": "It can lead to kidney damage, liver damage, pulmonary hypertension, and arrhythmias.",
+    "source_document": null
+  },
+  {
+    "id": "018",
+    "question": "Which populations have higher rates of diabetes diagnosis according to survey data?",
+    "answer": "Non-Hispanic Blacks and Hispanics have higher rates than Whites.",
+    "source_document": null
+  },
+  {
+    "id": "019",
+    "question": "What percentage of people with diabetes are aware of the A1C test?",
+    "answer": "About 89% of people with diabetes are aware of it.",
+    "source_document": null
+  },
+  {
+    "id": "020",
+    "question": "What role do healthcare providers and family members play in diabetes management?",
+    "answer": "They provide guidance, counseling, and support for prevention and management.",
     "source_document": null
   }
 ]
