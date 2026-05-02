@@ -21,6 +21,7 @@ class SourceReference(BaseModel):
     chunk_id: str
     document_id: str
     source: str
+    content: str
     page_number: int | None
     section_title: str | None
     similarity: float
@@ -56,6 +57,7 @@ async def chat(
                 chunk_id=s["chunk_id"],
                 document_id=s["document_id"],
                 source=s["source"],
+                content=s.get("content", ""),
                 page_number=s.get("page_number"),
                 section_title=s.get("section_title"),
                 similarity=s["similarity"],
