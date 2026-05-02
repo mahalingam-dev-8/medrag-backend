@@ -1,60 +1,110 @@
-"""RAG evaluation metrics (Phase 4).
+"""RAG evaluation using RAGAS with OpenAI as judge.
 
-Implements faithfulness, relevance, and basic hallucination detection.
+Metrics:
+  - faithfulness      : are claims in the answer supported by context?
+  - answer_relevancy  : does the answer address the question?
+  - context_precision : were the retrieved chunks actually needed?
+
+Cost: ~$0.005 for 15 samples using gpt-4o-mini.
+
+Setup:
+    pip install 'ragas>=0.2.0' langchain-openai
+    Set OPENAI_API_KEY in .env
 """
 
-from dataclasses import dataclass, field
+from __future__ import annotations
+
+import os
+from dataclasses import dataclass
 
 
 @dataclass
-class EvalResult:
+class EvalSample:
     question: str
-    expected_answer: str
-    actual_answer: str
-    retrieved_chunks: list[str]
-    faithfulness_score: float = 0.0
-    relevance_score: float = 0.0
-    notes: list[str] = field(default_factory=list)
+    answer: str
+    contexts: list[str]
+    reference: str = ""
 
 
-def keyword_faithfulness(answer: str, chunks: list[str]) -> float:
-    """Rough faithfulness: fraction of answer words found in context."""
-    if not chunks or not answer:
-        return 0.0
-    context = " ".join(chunks).lower()
-    words = [w.lower() for w in answer.split() if len(w) > 4]
-    if not words:
-        return 1.0
-    hits = sum(1 for w in words if w in context)
-    return hits / len(words)
+@dataclass
+class EvalSummary:
+    total: int
+    faithfulness: float
+    answer_relevancy: float
+    context_precision: float
+    context_recall: float
+    answer_correctness: float
+
+    def as_dict(self) -> dict:
+        return {
+            "total": self.total,
+            "faithfulness": round(self.faithfulness, 3),
+            "answer_relevancy": round(self.answer_relevancy, 3),
+            "context_precision": round(self.context_precision, 3),
+            "context_recall": round(self.context_recall, 3),
+            "answer_correctness": round(self.answer_correctness, 3),
+        }
 
 
-def evaluate_batch(
-    questions: list[str],
-    expected_answers: list[str],
-    actual_answers: list[str],
-    retrieved_chunks_per_query: list[list[str]],
-) -> list[EvalResult]:
-    results = []
-    for q, exp, act, chunks in zip(questions, expected_answers, actual_answers, retrieved_chunks_per_query):
-        faith = keyword_faithfulness(act, chunks)
-        results.append(
-            EvalResult(
-                question=q,
-                expected_answer=exp,
-                actual_answer=act,
-                retrieved_chunks=chunks,
-                faithfulness_score=faith,
-            )
+def evaluate_ragas(samples: list[EvalSample]) -> EvalSummary:
+    """Full RAGAS evaluation using OpenAI gpt-4o-mini as judge."""
+    os.environ.setdefault("RAGAS_DO_NOT_TRACK", "true")
+
+    try:
+        from langchain_openai import ChatOpenAI, OpenAIEmbeddings
+        from ragas import EvaluationDataset, RunConfig, evaluate
+        from ragas.dataset_schema import SingleTurnSample
+        from ragas.embeddings import LangchainEmbeddingsWrapper
+        from ragas.llms import LangchainLLMWrapper
+        from ragas.metrics import (
+            answer_correctness,
+            answer_relevancy,
+            context_precision,
+            context_recall,
+            faithfulness,
         )
-    return results
+    except ImportError as exc:
+        raise RuntimeError(
+            "Run: pip install 'ragas>=0.2.0' langchain-openai"
+        ) from exc
 
+    openai_key = os.getenv("OPENAI_API_KEY", "")
+    if not openai_key:
+        raise RuntimeError("OPENAI_API_KEY not set in .env")
 
-def summary_stats(results: list[EvalResult]) -> dict:
-    if not results:
-        return {}
-    avg_faith = sum(r.faithfulness_score for r in results) / len(results)
-    return {
-        "total": len(results),
-        "avg_faithfulness": round(avg_faith, 3),
-    }
+    print("  Judge: OpenAI gpt-4o-mini (~$0.005 for 15 samples)")
+
+    llm = LangchainLLMWrapper(
+        ChatOpenAI(model="gpt-4o-mini", api_key=openai_key, temperature=0)
+    )
+    embeddings = LangchainEmbeddingsWrapper(
+        OpenAIEmbeddings(model="text-embedding-3-small", api_key=openai_key)
+    )
+
+    dataset = EvaluationDataset(samples=[
+        SingleTurnSample(
+            user_input=s.question,
+            response=s.answer,
+            retrieved_contexts=s.contexts,
+            reference=s.reference or s.answer,
+        )
+        for s in samples
+    ])
+
+    results = evaluate(
+        dataset=dataset,
+        metrics=[faithfulness, answer_relevancy, context_precision, context_recall, answer_correctness],
+        llm=llm,
+        embeddings=embeddings,
+        run_config=RunConfig(timeout=60, max_retries=3, max_wait=30),
+    )
+
+    df = results.to_pandas()
+    return EvalSummary(
+        total=len(df),
+        faithfulness=float(df["faithfulness"].mean()),
+        answer_relevancy=float(df["answer_relevancy"].mean()),
+        context_precision=float(df["context_precision"].mean()),
+        context_recall=float(df["context_recall"].mean()),
+        answer_correctness=float(df["answer_correctness"].mean()),
+    )
