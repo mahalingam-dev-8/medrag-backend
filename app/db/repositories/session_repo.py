@@ -59,6 +59,15 @@ class SessionRepository:
         chat_session = await self.get_session(session_id)
         chat_session.title = title
 
+    async def list_sessions(self, limit: int = 50) -> list[ChatSession]:
+        result = await self.session.execute(
+            select(ChatSession)
+            .where(ChatSession.is_active == True)  # noqa: E712
+            .order_by(ChatSession.created_at.desc())
+            .limit(limit)
+        )
+        return list(result.scalars().all())
+
     async def deactivate_session(self, session_id: uuid.UUID) -> None:
         chat_session = await self.get_session(session_id)
         chat_session.is_active = False
