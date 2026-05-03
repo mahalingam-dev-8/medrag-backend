@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
@@ -19,6 +20,7 @@ class SessionResponse(BaseModel):
     id: uuid.UUID
     title: str | None
     is_active: bool
+    created_at: datetime
 
 
 class MessageResponse(BaseModel):
@@ -49,13 +51,24 @@ class SessionChatResponse(BaseModel):
     session_id: uuid.UUID
 
 
+@router.get("/", response_model=list[SessionResponse])
+async def list_sessions(
+    service: ChatService = Depends(get_chat_service),
+) -> list[SessionResponse]:
+    sessions = await service._session_repo.list_sessions()
+    return [
+        SessionResponse(id=s.id, title=s.title, is_active=s.is_active, created_at=s.created_at)
+        for s in sessions
+    ]
+
+
 @router.post("/", response_model=SessionResponse)
 async def create_session(
     request: CreateSessionRequest,
     service: ChatService = Depends(get_chat_service),
 ) -> SessionResponse:
     session = await service._session_repo.create_session(title=request.title)
-    return SessionResponse(id=session.id, title=session.title, is_active=session.is_active)
+    return SessionResponse(id=session.id, title=session.title, is_active=session.is_active, created_at=session.created_at)
 
 
 @router.get("/{session_id}/", response_model=SessionDetailResponse)
