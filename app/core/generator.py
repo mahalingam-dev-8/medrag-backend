@@ -19,10 +19,17 @@ class Generator:
     def client(self) -> AsyncOpenAI:
         if self._client is None:
             self._client = AsyncOpenAI(
-                api_key=settings.groq_api_key,
-                base_url=settings.groq_base_url,
+                api_key=settings.llm_api_key,
+                base_url=settings.llm_base_url,
             )
         return self._client
+
+    @staticmethod
+    def _extra_body() -> dict | None:
+        # Sent as a raw body field so it works on any openai SDK version.
+        if settings.llm_reasoning_effort:
+            return {"reasoning_effort": settings.llm_reasoning_effort}
+        return None
 
     def _build_messages(
         self,
@@ -58,6 +65,7 @@ class Generator:
                 messages=self._build_messages(user_prompt, context_chunks, history),
                 max_tokens=_max_tokens,
                 temperature=_temperature,
+                extra_body=self._extra_body(),
             )
             answer = response.choices[0].message.content or ""
             logger.info(
@@ -91,6 +99,7 @@ class Generator:
                 max_tokens=_max_tokens,
                 temperature=_temperature,
                 stream=True,
+                extra_body=self._extra_body(),
             )
             async for chunk in response:
                 token = chunk.choices[0].delta.content
