@@ -12,6 +12,7 @@ RUN pip install --no-cache-dir -e .
 # Pre-download embedding model into a fixed path so it survives layer caching
 ENV FASTEMBED_CACHE_PATH=/app/.cache/fastembed
 RUN python -c "from fastembed import TextEmbedding; TextEmbedding('sentence-transformers/all-MiniLM-L6-v2')"
+RUN python -c "from fastembed.rerank.cross_encoder import TextCrossEncoder; TextCrossEncoder('Xenova/ms-marco-MiniLM-L-6-v2')"
 
 COPY app/ app/
 COPY scripts/ scripts/
