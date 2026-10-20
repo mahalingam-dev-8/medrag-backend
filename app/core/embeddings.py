@@ -1,5 +1,4 @@
 import asyncio
-import gc
 from functools import lru_cache
 
 from fastembed import TextEmbedding
@@ -30,8 +29,9 @@ class EmbeddingService:
         results: list[list[float]] = []
         for i in range(0, len(texts), _BATCH_SIZE):
             batch = texts[i : i + _BATCH_SIZE]
+            # No gc.collect() here: these lists have no reference cycles, so they're freed
+            # without it, and a full collection took 1-15 s per call on a 0.1 CPU instance.
             results.extend(emb.tolist() for emb in self.model.embed(batch))
-            gc.collect()
         return results
 
     async def embed_text(self, text: str) -> list[float]:
