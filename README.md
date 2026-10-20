@@ -15,7 +15,7 @@
 
 ## What It Does
 
-MedRAG Assistant lets clinicians and researchers upload medical PDFs (guidelines, clinical studies, drug references) and ask natural language questions against them. It uses **hybrid retrieval** (BM25 + semantic search) with **cross-encoder re-ranking** to surface the most relevant context, **query rewriting** to handle follow-up questions in multi-turn conversations, and **Groq's LLaMA 3.3 70B** to generate grounded answers with source citations — all deployed on a free-tier stack with no cold-start model downloads.
+MedRAG Assistant lets clinicians and researchers upload medical PDFs (guidelines, clinical studies, drug references) and ask natural language questions against them. It uses **hybrid retrieval** (BM25 + semantic search) with **cross-encoder re-ranking** to surface the most relevant context, **query rewriting** to handle follow-up questions in multi-turn conversations, and **Google Gemini** to generate grounded answers with source citations — all deployed on a free-tier stack with no cold-start model downloads.
 
 ---
 
@@ -27,17 +27,17 @@ flowchart TD
     FE["React + TypeScript\nVercel"]
     API["FastAPI\nRender"]
     DB["PostgreSQL + pgvector\nNeon"]
-    Groq["Groq API\nLLaMA 3.3 70B"]
+    LLM["Google Gemini\nOpenAI-compatible API"]
     Embed["fastembed\nall-MiniLM-L6-v2"]
 
     User -->|"chat / upload"| FE
     FE -->|"REST + SSE"| API
 
     subgraph RAG Pipeline
-        API -->|"1 · rewrite query"| Groq
+        API -->|"1 · rewrite query"| LLM
         API -->|"2 · hybrid search\nBM25 + cosine"| DB
         API -->|"3 · cross-encoder\nrerank top-20 → top-5"| API
-        API -->|"4 · generate answer"| Groq
+        API -->|"4 · generate answer"| LLM
     end
 
     subgraph Ingestion
@@ -57,7 +57,7 @@ flowchart TD
 | **API** | FastAPI + Uvicorn | Async-native, auto OpenAPI docs |
 | **Database** | PostgreSQL + pgvector (Neon) | Single store for documents, vectors, and chat history |
 | **Embeddings** | fastembed (ONNX) | No PyTorch — fits in 512 MB Render free tier |
-| **LLM** | Groq LLaMA 3.3 70B | Free tier, OpenAI-compatible, fast inference |
+| **LLM** | Google Gemini (OpenAI-compatible API) | Free tier; any OpenAI-compatible provider works by configuration |
 | **Retrieval** | Hybrid BM25 + cosine + RRF | Handles exact medical terms and semantic queries |
 | **Reranker** | Cross-encoder (ms-marco-MiniLM) | Re-scores top-20 candidates before generation |
 | **Frontend** | React + TypeScript + Tailwind + shadcn/ui | Vercel |
