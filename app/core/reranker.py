@@ -45,10 +45,8 @@ class Reranker:
     That's why we run it only on the top-20 candidates, not the whole table.
 
     Runs as ONNX through fastembed (no PyTorch), so it fits the same 512 MB instance as
-    the embeddings. The default TinyBERT-L-2 (2 layers) re-ranks 20 chunks in ~2 s on the
-    free instance's 0.1 CPU, where MiniLM-L-6 took ~30 s. Chunks scoring below ``min_score``
-    are dropped rather than passed to the LLM: ms-marco scores are logits, and clearly
-    unrelated chunks land far below zero.
+    the embeddings. Chunks scoring below ``min_score`` are dropped rather than passed to the
+    LLM: ms-marco scores are logits, and clearly unrelated chunks land far below zero.
     """
 
     def __init__(self, model_name: str, min_score: float, batch_size: int = _BATCH_SIZE) -> None:

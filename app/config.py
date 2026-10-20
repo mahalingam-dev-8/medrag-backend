@@ -45,9 +45,8 @@ class Settings(BaseSettings):
     retrieval_candidate_k: int = Field(default=20)
     hybrid_search_enabled: bool = Field(default=True)
 
-    # Reranker — ONNX cross-encoder run by fastembed (no PyTorch). TinyBERT-L-2 is small
-    # enough for a 0.1 CPU instance; MiniLM-L-6 is more precise but ~15x slower.
-    reranker_model: str = Field(default="Xenova/ms-marco-TinyBERT-L-2-v2")
+    # Reranker — ONNX cross-encoder run by fastembed (no PyTorch)
+    reranker_model: str = Field(default="Xenova/ms-marco-MiniLM-L-6-v2")
     # Chunks scoring below this are dropped. ms-marco scores are logits: relevant chunks score
     # above 0, clearly unrelated ones around -6 to -10. Set very low (e.g. -100) to keep all.
     reranker_min_score: float = Field(default=-4.0)
