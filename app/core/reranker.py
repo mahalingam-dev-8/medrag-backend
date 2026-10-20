@@ -11,6 +11,7 @@ logger = get_logger(__name__)
 # sentence-transformers model names map to the ONNX builds fastembed ships, so existing
 # RERANKER_MODEL values keep working without installing PyTorch.
 _ONNX_MODELS = {
+    "cross-encoder/ms-marco-TinyBERT-L-2-v2": "Xenova/ms-marco-TinyBERT-L-2-v2",
     "cross-encoder/ms-marco-MiniLM-L-6-v2": "Xenova/ms-marco-MiniLM-L-6-v2",
     "cross-encoder/ms-marco-MiniLM-L-12-v2": "Xenova/ms-marco-MiniLM-L-12-v2",
 }
@@ -22,6 +23,20 @@ _BATCH_SIZE = 2
 _MAX_CHARS = 1500
 
 
+def load_cross_encoder(model_name: str):
+    """Loads an ONNX cross-encoder, registering Hugging Face repos fastembed doesn't list.
+
+    Runs on one thread: the free instance has 0.1 CPU, and ONNX Runtime's default of one
+    thread per host core only makes those threads fight over that slice.
+    """
+    from fastembed.common.model_description import ModelSource
+    from fastembed.rerank.cross_encoder import TextCrossEncoder
+
+    if model_name not in {m["model"] for m in TextCrossEncoder.list_supported_models()}:
+        TextCrossEncoder.add_custom_model(model=model_name, sources=ModelSource(hf=model_name))
+    return TextCrossEncoder(model_name=model_name, threads=1)
+
+
 class Reranker:
     """Re-ranks retrieved chunks using a cross-encoder model.
 
@@ -30,8 +45,10 @@ class Reranker:
     That's why we run it only on the top-20 candidates, not the whole table.
 
     Runs as ONNX through fastembed (no PyTorch), so it fits the same 512 MB instance as
-    the embeddings. Chunks scoring below ``min_score`` are dropped rather than passed to the
-    LLM: ms-marco scores are logits, and clearly unrelated chunks land far below zero.
+    the embeddings. The default TinyBERT-L-2 (2 layers) re-ranks 20 chunks in ~2 s on the
+    free instance's 0.1 CPU, where MiniLM-L-6 took ~30 s. Chunks scoring below ``min_score``
+    are dropped rather than passed to the LLM: ms-marco scores are logits, and clearly
+    unrelated chunks land far below zero.
     """
 
     def __init__(self, model_name: str, min_score: float, batch_size: int = _BATCH_SIZE) -> None:
@@ -45,10 +62,8 @@ class Reranker:
         # Loaded once. A load failure raises instead of silently skipping re-ranking,
         # which is how this step previously went missing unnoticed.
         if self._model is None:
-            from fastembed.rerank.cross_encoder import TextCrossEncoder
-
             logger.info("loading_reranker_model", model=self.model_name)
-            self._model = TextCrossEncoder(model_name=self.model_name)
+            self._model = load_cross_encoder(self.model_name)
         return self._model
 
     async def rerank(
