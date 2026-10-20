@@ -15,6 +15,12 @@ _ONNX_MODELS = {
     "cross-encoder/ms-marco-MiniLM-L-12-v2": "Xenova/ms-marco-MiniLM-L-12-v2",
 }
 
+# Working memory grows with batch size x text length. Batches of 8 full chunks pushed the
+# process past 512 MB; 2 chunks of at most 1500 chars stays ~30 MB above idle. The start of
+# a chunk is enough to judge relevance (the model cuts at 512 tokens anyway).
+_BATCH_SIZE = 2
+_MAX_CHARS = 1500
+
 
 class Reranker:
     """Re-ranks retrieved chunks using a cross-encoder model.
@@ -28,7 +34,7 @@ class Reranker:
     LLM: ms-marco scores are logits, and clearly unrelated chunks land far below zero.
     """
 
-    def __init__(self, model_name: str, min_score: float, batch_size: int = 8) -> None:
+    def __init__(self, model_name: str, min_score: float, batch_size: int = _BATCH_SIZE) -> None:
         self.model_name = _ONNX_MODELS.get(model_name, model_name)
         self.min_score = min_score
         self.batch_size = batch_size
@@ -56,7 +62,7 @@ class Reranker:
         try:
             logger.info("reranking_chunks", candidates=len(results), top_k=top_k)
             loop = asyncio.get_running_loop()
-            documents = [r.chunk.content for r in results]
+            documents = [r.chunk.content[:_MAX_CHARS] for r in results]
             scores = await loop.run_in_executor(
                 None, lambda: list(self.model.rerank(query, documents, batch_size=self.batch_size))
             )
