@@ -1,106 +1,70 @@
 # MedRAG Assistant
 
-![demo](https://github.com/user-attachments/assets/984d20c8-c6ae-42e3-8bfe-2650f2747326)
+Ask questions about medical PDFs (clinical guidelines, studies, drug references) and get answers that cite the exact source and page. Retrieval is hybrid search with cross-encoder re-ranking, and Google Gemini writes the answer.
 
-[![Python](https://img.shields.io/badge/Python-3.11-3776AB?logo=python&logoColor=white)](https://python.org)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.111-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
-[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-pgvector-4169E1?logo=postgresql&logoColor=white)](https://github.com/pgvector/pgvector)
-[![React](https://img.shields.io/badge/React-TypeScript-61DAFB?logo=react&logoColor=black)](https://react.dev)
-[![Deployed on Render](https://img.shields.io/badge/Backend-Render-46E3B7?logo=render&logoColor=white)](https://api-linga.onrender.com)
-[![Frontend on Vercel](https://img.shields.io/badge/Frontend-Vercel-000000?logo=vercel&logoColor=white)](https://medrag-frontend-lilac.vercel.app)
+**[▶ Watch the demo](https://www.loom.com/share/ca3d9b4ca0e64aa39f77bb86b2a96ec6)** · **[Live app](https://medrag-frontend-lilac.vercel.app)** · **[API docs](https://api-linga.onrender.com/docs)** · **[Frontend repo](https://github.com/mahalingam-dev-8/medrag-frontend)**
 
-**[Live Demo](https://medrag-frontend-lilac.vercel.app)** · **[API Docs](https://api-linga.onrender.com/docs)**
+> The backend runs on a free instance. If it has been idle, the first request can take up to a minute.
 
----
+### Try asking
 
-## What It Does
+- *What are the common symptoms of an asthma attack, and what should a patient do first?*
+- *How can you tell heart failure from an asthma attack based on symptoms, and when is emergency care needed?*
+- *What is the recommended treatment for a fractured wrist?* The documents don't cover this, so it should say so rather than guess.
 
-MedRAG Assistant lets clinicians and researchers upload medical PDFs (guidelines, clinical studies, drug references) and ask natural language questions against them. It uses **hybrid retrieval** (Postgres full-text + semantic search) with **cross-encoder re-ranking** to surface the most relevant context, and **Google Gemini** to generate grounded answers with source citations — all deployed on a free-tier stack with no cold-start model downloads.
-
----
-
-## Architecture
+## How it works
 
 ```mermaid
 flowchart TD
-    User["👤 User"]
-    FE["React + TypeScript\nVercel"]
-    API["FastAPI\nRender"]
-    DB["PostgreSQL + pgvector\nNeon"]
-    LLM["Google Gemini\nOpenAI-compatible API"]
-    Embed["fastembed\nall-MiniLM-L6-v2"]
+    User[User] -->|chat, upload| FE[React + TypeScript<br/>Vercel]
+    FE -->|REST + SSE| API[FastAPI<br/>Render]
 
-    User -->|"chat / upload"| FE
-    FE -->|"REST + SSE"| API
-
-    subgraph RAG Pipeline
-        API -->|"1 · hybrid search\nfull-text + cosine"| DB
-        API -->|"2 · cross-encoder\nrerank top-20 → top-5"| API
-        API -->|"3 · generate answer"| LLM
+    subgraph Answering a question
+        API -->|1. hybrid search: full-text + cosine| DB[(PostgreSQL + pgvector<br/>Neon)]
+        API -->|2. cross-encoder re-rank: top 20 to top 5| API
+        API -->|3. generate a cited answer| LLM[Google Gemini]
     end
 
-    subgraph Ingestion
-        API -->|"chunk → embed"| Embed
-        Embed -->|"store vectors"| DB
+    subgraph Ingesting a PDF
+        API -->|chunk and embed| Embed[fastembed, ONNX]
+        Embed -->|store vectors| DB
     end
 
-    API -->|"streamed tokens"| FE
+    API -->|streamed tokens| FE
 ```
 
----
+## Why it's built this way
 
-## Tech Stack
+**Hybrid search, because medical terms break pure semantic search.** Abbreviations and drug names like "eGFR", "SGLT2" or "A1C" have no close neighbours in embedding space, so semantic search alone misses them. Postgres full-text search catches the exact terms, semantic search catches paraphrases, and Reciprocal Rank Fusion merges the two lists without having to normalise their scores.
 
-| Layer | Technology | Why |
+**A cross-encoder for the final ranking.** Cosine similarity compares the question and each chunk separately, which is fast but approximate. A cross-encoder reads them together and scores them much more accurately, but it's too slow to run on everything. So the app retrieves 20 candidates cheaply and re-ranks only those down to the 5 that go to the LLM.
+
+**pgvector instead of a separate vector database.** Documents, vectors and chat history all live in one Postgres database: one connection, one transaction boundary, one backup. At this scale, Pinecone or Weaviate would add moving parts without a measurable gain.
+
+**ONNX embeddings to fit a 512 MB server.** fastembed runs the embedding model on ONNX Runtime instead of PyTorch, so the whole API fits on Render's free tier with no model download at startup.
+
+## Evaluation
+
+I wrote 15 question-and-answer pairs across three topics (diabetes guidelines, heart failure, and NNDS survey data) and scored the system with RAGAS, using `gpt-4o-mini` as the judge.
+
+| Metric | Score | What it measures |
 |---|---|---|
-| **API** | FastAPI + Uvicorn | Async-native, auto OpenAPI docs |
-| **Database** | PostgreSQL + pgvector (Neon) | Single store for documents, vectors, and chat history |
-| **Embeddings** | fastembed (ONNX) | No PyTorch — fits in 512 MB Render free tier |
-| **LLM** | Google Gemini (OpenAI-compatible API) | Free tier; any OpenAI-compatible provider works by configuration |
-| **Retrieval** | Hybrid full-text + cosine + RRF | Handles exact medical terms and semantic queries |
-| **Reranker** | Cross-encoder (ms-marco-MiniLM) | Re-scores top-20 candidates before generation |
-| **Frontend** | React + TypeScript + Tailwind + shadcn/ui | Vercel |
-| **Evaluation** | RAGAS + OpenAI gpt-4o-mini | Industry-standard RAG metrics |
+| Context recall | **0.933** | The retrieved chunks contain what the reference answer needs |
+| Context precision | **0.882** | The retrieved chunks are relevant, with little noise |
+| Faithfulness | **0.862** | The answer's claims are backed by the retrieved text |
+| Answer relevancy | **0.811** | The answer addresses the question |
+| Answer correctness | 0.493 | Wording and facts match the reference answer |
 
----
+Answer correctness is low mostly because the reference answers are short fragments and the model writes full sentences, which the metric penalises even when the facts are right. Context recall and faithfulness are the better signals of whether the system works.
 
-## Key Engineering Decisions
+Before settling on `gpt-4o-mini` as the judge, I tried a few others: local FastEmbed similarity (blind to negation and hallucination), Ollama llama3.2 (over 5 minutes per sample, plus JSON parsing errors) and Groq (hit daily token limits mid-run). `gpt-4o-mini` gave reliable JSON for under $0.005 per full run.
 
-### Hybrid search (full-text + semantic) for medical terminology
-Pure semantic search fails on medical abbreviations and drug names — "eGFR", "SGLT2", "A1C" have no common synonyms in the embedding space. Postgres full-text search handles exact-match recall; semantic search handles paraphrasing. Reciprocal Rank Fusion (RRF) merges both ranked lists without requiring score normalization.
+## Tech stack
 
-### Cross-encoder re-ranking
-Bi-encoder retrieval (cosine similarity) is fast but approximate — it compares query and chunk embeddings independently. A cross-encoder sees both together and re-scores token-level interactions. We retrieve 20 candidates and rerank to the top 5 sent to the LLM, improving precision without increasing retrieval latency significantly.
+FastAPI · PostgreSQL + pgvector (Neon) · fastembed (ONNX) · ms-marco-MiniLM cross-encoder · Google Gemini · RAGAS · React + TypeScript · Render · Vercel
 
-### pgvector over Pinecone / Weaviate
-pgvector keeps vectors in the same Postgres instance as documents and chat history — one connection, one transaction boundary, one backup. For a project at this scale, a dedicated vector database adds operational complexity with no measurable benefit.
-
-### OpenAI for evaluation (after testing alternatives)
-Evaluated three judge configurations before settling on OpenAI:
-- **FastEmbed (local)** — embedding similarity only, blind to negation and hallucinations
-- **Ollama llama3.2** — free but too slow for CI use (5+ min/sample), JSON parsing errors
-- **Groq** — fast but daily token limits exhausted during iterative eval runs
-- **OpenAI gpt-4o-mini** — reliable JSON output, <$0.005 per full eval run, no rate issues
-
----
-
-## Evaluation Results
-
-Evaluated on 15 hand-written Q&A pairs across three medical topics: diabetes guidelines, heart failure, and NNDS survey data. Judge: OpenAI `gpt-4o-mini` via RAGAS.
-
-| Metric | Score | What It Measures |
-|---|---|---|
-| **Context Recall** | **0.933** | Retrieved chunks cover the reference answer |
-| **Context Precision** | **0.882** | Retrieved chunks are relevant (low noise) |
-| **Faithfulness** | **0.862** | Answer claims are grounded in retrieved context |
-| **Answer Relevancy** | **0.811** | Answer addresses the question asked |
-| **Answer Correctness** | **0.493** | Semantic + factual match to reference answer |
-
-**On answer correctness:** The 0.49 reflects a known limitation of the metric — it penalizes paraphrasing even when the answer is factually correct. The LLM generates complete sentences while reference answers are short fragments. The high faithfulness (0.86) and context recall (0.93) are stronger indicators of actual system quality.
-
----
-
-## Local Development
+<details>
+<summary><b>Run locally</b></summary>
 
 ```bash
 git clone https://github.com/mahalingam-dev-8/medrag-backend.git
@@ -110,24 +74,18 @@ pip install -e .
 uvicorn app.main:app --reload
 ```
 
-**Run evaluation** (requires `OPENAI_API_KEY` in `.env`):
+Run the evaluation (needs `OPENAI_API_KEY` in `.env`):
+
 ```bash
 pip install ".[eval]"
 python evaluation/run_eval.py --api-url http://localhost:8000
 ```
 
----
+</details>
 
-## Future Work
+## What I'd add next
 
-- **Background task queue** — replace FastAPI `BackgroundTasks` with Celery + Redis for reliable async ingestion with retries and progress tracking
-- **Retrieval A/B benchmarking** — automated comparison of chunk sizes, top-k values, and hybrid search weights against the RAGAS eval set
-- **Redis caching** — cache embeddings and frequent query results to reduce Groq API calls
-- **Local LLM via Ollama** — swap Groq for a self-hosted model for air-gapped / HIPAA-sensitive deployments
-- **Multi-modal support** — extract and index tables and figures from medical PDFs using a vision model
-
----
-
-## Related
-
-- [Frontend Repository](https://github.com/mahalingam-dev-8/medrag-frontend) — React + TypeScript + shadcn/ui
+- A proper job queue (Celery + Redis) for ingesting PDFs, with retries and progress, instead of FastAPI's `BackgroundTasks`.
+- Automated A/B runs of chunk size, top-k and search weights against the RAGAS set.
+- A self-hosted model through Ollama, for deployments where documents can't leave the network.
+- Indexing tables and figures from PDFs, not just text.
