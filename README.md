@@ -2,7 +2,7 @@
 
 Ask questions about medical PDFs (clinical guidelines, studies, drug references) and get answers that cite the exact source and page. Retrieval is hybrid search with cross-encoder re-ranking, and Google Gemini writes the answer.
 
-**[Frontend repo](https://github.com/mahalingam-dev-8/medrag-frontend)**
+**[▶ Watch the demo](https://www.loom.com/share/ca3d9b4ca0e64aa39f77bb86b2a96ec6)** · **[Frontend repo](https://github.com/mahalingam-dev-8/medrag-frontend)**
 
 ### Try asking
 
