@@ -2,9 +2,7 @@
 
 Ask questions about medical PDFs (clinical guidelines, studies, drug references) and get answers that cite the exact source and page. Retrieval is hybrid search with cross-encoder re-ranking, and Google Gemini writes the answer.
 
-**[▶ Watch the demo](https://www.loom.com/share/ca3d9b4ca0e64aa39f77bb86b2a96ec6)** · **[Live app](https://medrag-frontend-lilac.vercel.app)** · **[API docs](https://api-linga.onrender.com/docs)** · **[Frontend repo](https://github.com/mahalingam-dev-8/medrag-frontend)**
-
-> The backend runs on a free instance. If it has been idle, the first request can take up to a minute.
+**[Frontend repo](https://github.com/mahalingam-dev-8/medrag-frontend)**
 
 ### Try asking
 
@@ -16,11 +14,11 @@ Ask questions about medical PDFs (clinical guidelines, studies, drug references)
 
 ```mermaid
 flowchart TD
-    User[User] -->|chat, upload| FE[React + TypeScript<br/>Vercel]
-    FE -->|REST + SSE| API[FastAPI<br/>Render]
+    User[User] -->|chat, upload| FE[React + TypeScript]
+    FE -->|REST + SSE| API[FastAPI]
 
     subgraph Answering a question
-        API -->|1. hybrid search: full-text + cosine| DB[(PostgreSQL + pgvector<br/>Neon)]
+        API -->|1. hybrid search: full-text + cosine| DB[(PostgreSQL + pgvector)]
         API -->|2. cross-encoder re-rank: top 20 to top 5| API
         API -->|3. generate a cited answer| LLM[Google Gemini]
     end
@@ -41,7 +39,7 @@ flowchart TD
 
 **pgvector instead of a separate vector database.** Documents, vectors and chat history all live in one Postgres database: one connection, one transaction boundary, one backup. At this scale, Pinecone or Weaviate would add moving parts without a measurable gain.
 
-**ONNX embeddings to fit a 512 MB server.** fastembed runs the embedding model on ONNX Runtime instead of PyTorch, so the whole API fits on Render's free tier with no model download at startup.
+**ONNX embeddings to fit a 512 MB server.** fastembed runs the embedding model on ONNX Runtime instead of PyTorch, so the whole API fits within that limit with no model download at startup.
 
 ## Evaluation
 
@@ -61,7 +59,7 @@ Before settling on `gpt-4o-mini` as the judge, I tried a few others: local FastE
 
 ## Tech stack
 
-FastAPI · PostgreSQL + pgvector (Neon) · fastembed (ONNX) · ms-marco-MiniLM cross-encoder · Google Gemini · RAGAS · React + TypeScript · Render · Vercel
+FastAPI · PostgreSQL + pgvector · fastembed (ONNX) · ms-marco-MiniLM cross-encoder · Google Gemini · RAGAS · React + TypeScript
 
 <details>
 <summary><b>Run locally</b></summary>
